@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2023 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import org.apache.commons.logging.LogFactory;
 
 import org.springframework.cloud.openfeign.AnnotatedParameterProcessor;
 import org.springframework.cloud.openfeign.CollectionFormat;
+import org.springframework.cloud.openfeign.FeignClientProperties;
 import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.cloud.openfeign.annotation.CookieValueParameterProcessor;
 import org.springframework.cloud.openfeign.annotation.MatrixVariableParameterProcessor;
@@ -87,6 +88,7 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
  * @author Darren Foong
  * @author Ram Anaswara
  * @author Sam Kruglov
+ * @author Tang Xiong
  */
 public class SpringMvcContract extends Contract.BaseContract implements ResourceLoaderAware {
 
@@ -114,6 +116,8 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 
 	private final boolean decodeSlash;
 
+	private final boolean removeTrailingSlash;
+
 	public SpringMvcContract() {
 		this(Collections.emptyList());
 	}
@@ -127,8 +131,36 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		this(annotatedParameterProcessors, conversionService, true);
 	}
 
+	/**
+	 * Creates a {@link SpringMvcContract} based on annotatedParameterProcessors,
+	 * conversionService and decodeSlash value.
+	 * @param annotatedParameterProcessors list of {@link AnnotatedParameterProcessor}
+	 * objects used to resolve parameters
+	 * @param conversionService {@link ConversionService} used for type conversion
+	 * @param decodeSlash indicates whether slashes should be decoded
+	 * @deprecated in favour of
+	 * {@link SpringMvcContract#SpringMvcContract(List, ConversionService, FeignClientProperties)}
+	 */
+	@Deprecated(forRemoval = true)
 	public SpringMvcContract(List<AnnotatedParameterProcessor> annotatedParameterProcessors,
 			ConversionService conversionService, boolean decodeSlash) {
+		this(annotatedParameterProcessors, conversionService, decodeSlash, false);
+	}
+
+	/**
+	 * Creates a {@link SpringMvcContract} based on annotatedParameterProcessors,
+	 * conversionService and decodeSlash value.
+	 * @param annotatedParameterProcessors list of {@link AnnotatedParameterProcessor}
+	 * objects used to resolve parameters
+	 * @param conversionService {@link ConversionService} used for type conversion
+	 * @param decodeSlash indicates whether slashes should be decoded
+	 * @param removeTrailingSlash indicates whether trailing slashes should be removed
+	 * @deprecated in favour of
+	 * {@link SpringMvcContract#SpringMvcContract(List, ConversionService, FeignClientProperties)}
+	 */
+	@Deprecated(forRemoval = true)
+	public SpringMvcContract(List<AnnotatedParameterProcessor> annotatedParameterProcessors,
+			ConversionService conversionService, boolean decodeSlash, boolean removeTrailingSlash) {
 		Assert.notNull(annotatedParameterProcessors, "Parameter processors can not be null.");
 		Assert.notNull(conversionService, "ConversionService can not be null.");
 
@@ -139,6 +171,14 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		this.conversionService = conversionService;
 		convertingExpanderFactory = new ConvertingExpanderFactory(conversionService);
 		this.decodeSlash = decodeSlash;
+		this.removeTrailingSlash = removeTrailingSlash;
+	}
+
+	public SpringMvcContract(List<AnnotatedParameterProcessor> annotatedParameterProcessors,
+			ConversionService conversionService, FeignClientProperties feignClientProperties) {
+		this(annotatedParameterProcessors, conversionService,
+				feignClientProperties == null || feignClientProperties.isDecodeSlash(),
+				feignClientProperties != null && feignClientProperties.isRemoveTrailingSlash());
 	}
 
 	private static TypeDescriptor createTypeDescriptor(Method method, int paramIndex) {
@@ -228,6 +268,9 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 				if (!pathValue.startsWith("/") && !data.template().path().endsWith("/")) {
 					pathValue = "/" + pathValue;
 				}
+				if (removeTrailingSlash && pathValue.endsWith("/")) {
+					pathValue = pathValue.substring(0, pathValue.length() - 1);
+				}
 				data.template().uri(pathValue, true);
 				if (data.template().decodeSlash() != decodeSlash) {
 					data.template().decodeSlash(decodeSlash);
@@ -243,6 +286,9 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 
 		// headers
 		parseHeaders(data, method, methodMapping);
+
+		// params
+		parseParams(data, method, methodMapping);
 
 		data.indexToExpander(new LinkedHashMap<>());
 	}
@@ -288,7 +334,7 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		Method method = processedMethods.get(data.configKey());
 		for (Annotation parameterAnnotation : annotations) {
 			AnnotatedParameterProcessor processor = annotatedArgumentProcessors
-					.get(parameterAnnotation.annotationType());
+				.get(parameterAnnotation.annotationType());
 			if (processor != null) {
 				Annotation processParameterAnnotation;
 				// synthesize, handling @AliasFor, while falling back to parameter name on
@@ -316,9 +362,9 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		for (int i = 0; i < paramsAnnotations.length; i++) {
 			Annotation[] paramAnnotations = paramsAnnotations[i];
 			Class<?> parameterType = data.method().getParameterTypes()[i];
-			if (Arrays.stream(paramAnnotations).anyMatch(
-					annotation -> Map.class.isAssignableFrom(parameterType) && annotation instanceof RequestParam
-							|| annotation instanceof SpringQueryMap || annotation instanceof QueryMap)) {
+			if (Arrays.stream(paramAnnotations)
+				.anyMatch(annotation -> Map.class.isAssignableFrom(parameterType) && annotation instanceof RequestParam
+						|| annotation instanceof SpringQueryMap || annotation instanceof QueryMap)) {
 				return true;
 			}
 		}
@@ -347,9 +393,25 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 			for (String header : annotation.headers()) {
 				int index = header.indexOf('=');
 				if (!header.contains("!=") && index >= 0) {
-					md.template().header(resolve(header.substring(0, index)),
-							resolve(header.substring(index + 1).trim()));
+					md.template()
+						.header(resolve(header.substring(0, index)), resolve(header.substring(index + 1).trim()));
 				}
+			}
+		}
+	}
+
+	private void parseParams(MethodMetadata data, Method method, RequestMapping methodMapping) {
+		String[] params = methodMapping.params();
+		if (params == null || params.length == 0) {
+			return;
+		}
+		for (String param : params) {
+			NameValueResolver nameValueResolver = new NameValueResolver(param);
+			if (!nameValueResolver.isNegated()) {
+				data.template().query(resolve(nameValueResolver.getName()), resolve(nameValueResolver.getValue()));
+			}
+			else {
+				throw new IllegalArgumentException("Negated params are not supported: " + param);
 			}
 		}
 	}
@@ -461,6 +523,42 @@ public class SpringMvcContract extends Contract.BaseContract implements Resource
 		@Override
 		public Collection<String> setTemplateParameter(String name, Collection<String> rest) {
 			return addTemplateParameter(rest, name);
+		}
+
+	}
+
+	private static class NameValueResolver {
+
+		private final String name;
+
+		private final String value;
+
+		private final boolean isNegated;
+
+		NameValueResolver(String expression) {
+			int separator = expression.indexOf('=');
+			if (separator == -1) {
+				isNegated = expression.startsWith("!");
+				name = (isNegated ? expression.substring(1) : expression);
+				value = null;
+			}
+			else {
+				isNegated = (separator > 0) && (expression.charAt(separator - 1) == '!');
+				name = (isNegated ? expression.substring(0, separator - 1) : expression.substring(0, separator));
+				value = expression.substring(separator + 1);
+			}
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public boolean isNegated() {
+			return isNegated;
 		}
 
 	}

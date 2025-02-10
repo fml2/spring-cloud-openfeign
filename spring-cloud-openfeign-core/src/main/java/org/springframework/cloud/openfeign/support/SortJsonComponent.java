@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2022 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,10 +34,12 @@ import feign.codec.EncodeException;
 import org.springframework.data.domain.Sort;
 
 /**
- * This class provides provides support for serializing and deserializing for Spring
- * {@link Sort} object.
+ * This class provides support for serializing and deserializing for Spring {@link Sort}
+ * object.
  *
  * @author Can Bezmen
+ * @author Olga Maciaszek-Sharma
+ * @author Gokalp Kuscu
  */
 public class SortJsonComponent {
 
@@ -72,13 +74,11 @@ public class SortJsonComponent {
 			TreeNode treeNode = jsonParser.getCodec().readTree(jsonParser);
 			if (treeNode.isArray()) {
 				ArrayNode arrayNode = (ArrayNode) treeNode;
-				List<Sort.Order> orders = new ArrayList<>();
-				for (JsonNode jsonNode : arrayNode) {
-					Sort.Order order = new Sort.Order(Sort.Direction.valueOf(jsonNode.get("direction").textValue()),
-							jsonNode.get("property").textValue());
-					orders.add(order);
-				}
-				return Sort.by(orders);
+				return toSort(arrayNode);
+			}
+			else if (treeNode.get("orders") != null && treeNode.get("orders").isArray()) {
+				ArrayNode arrayNode = (ArrayNode) treeNode.get("orders");
+				return toSort(arrayNode);
 			}
 			return null;
 		}
@@ -86,6 +86,31 @@ public class SortJsonComponent {
 		@Override
 		public Class<Sort> handledType() {
 			return Sort.class;
+		}
+
+		private static Sort toSort(ArrayNode arrayNode) {
+			List<Sort.Order> orders = new ArrayList<>();
+			for (JsonNode jsonNode : arrayNode) {
+				Sort.Order order;
+				// there is no way to construct without null handling
+				if ((jsonNode.has("ignoreCase") && jsonNode.get("ignoreCase").isBoolean())
+						&& jsonNode.has("nullHandling") && jsonNode.get("nullHandling").isTextual()) {
+
+					boolean ignoreCase = jsonNode.get("ignoreCase").asBoolean();
+					String nullHandlingValue = jsonNode.get("nullHandling").textValue();
+
+					order = new Sort.Order(Sort.Direction.valueOf(jsonNode.get("direction").textValue()),
+							jsonNode.get("property").textValue(), ignoreCase,
+							Sort.NullHandling.valueOf(nullHandlingValue));
+				}
+				else {
+					// backward compatibility
+					order = new Sort.Order(Sort.Direction.valueOf(jsonNode.get("direction").textValue()),
+							jsonNode.get("property").textValue());
+				}
+				orders.add(order);
+			}
+			return Sort.by(orders);
 		}
 
 	}

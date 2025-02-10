@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2022 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.http.HttpMessageConverters;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.client.HttpMessageConverterExtractor;
@@ -42,6 +42,7 @@ import static org.springframework.cloud.openfeign.support.FeignUtils.getHttpHead
 /**
  * @author Spencer Gibb
  * @author Olga Maciaszek-Sharma
+ * @author Maksym Pasichenko
  */
 public class SpringDecoder implements Decoder {
 
@@ -49,11 +50,6 @@ public class SpringDecoder implements Decoder {
 
 	private final ObjectProvider<HttpMessageConverterCustomizer> customizers;
 
-	/**
-	 * @deprecated in favour of
-	 * {@link SpringDecoder#SpringDecoder(ObjectFactory, ObjectProvider)}
-	 */
-	@Deprecated
 	public SpringDecoder(ObjectFactory<HttpMessageConverters> messageConverters) {
 		this(messageConverters, new EmptyObjectProvider<>());
 	}
@@ -87,11 +83,17 @@ public class SpringDecoder implements Decoder {
 		}
 
 		@Override
-		public HttpStatus getStatusCode() {
-			return HttpStatus.valueOf(response.status());
+		public HttpStatusCode getStatusCode() {
+			return HttpStatusCode.valueOf(response.status());
 		}
 
-		@Override
+		/**
+		 * This method used to override a method from ClientHttpResponse interface but was
+		 * removed in Spring Framework 6.2, so we should remove it as well.
+		 * @deprecated in favour of
+		 * {@link SpringDecoder.FeignResponseAdapter#getStatusCode()}
+		 */
+		@Deprecated(forRemoval = true)
 		public int getRawStatusCode() {
 			return response.status();
 		}
@@ -113,7 +115,7 @@ public class SpringDecoder implements Decoder {
 
 		@Override
 		public InputStream getBody() throws IOException {
-			return response.body().asInputStream();
+			return response.body() != null ? response.body().asInputStream() : null;
 		}
 
 		@Override

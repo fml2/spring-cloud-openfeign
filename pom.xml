@@ -4,14 +4,14 @@
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<artifactId>spring-cloud-openfeign</artifactId>
-	<version>4.1.0-SNAPSHOT</version>
+	<version>4.3.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>Spring Cloud OpenFeign</name>
 	<description>Spring Cloud OpenFeign</description>
 	<parent>
 		<groupId>org.springframework.cloud</groupId>
 		<artifactId>spring-cloud-build</artifactId>
-		<version>4.1.0-SNAPSHOT</version>
+		<version>4.3.0-SNAPSHOT</version>
 		<relativePath/>
 	</parent>
 	<scm>
@@ -25,13 +25,13 @@
 	</scm>
 	<properties>
 		<main.basedir>${basedir}</main.basedir>
-		<jackson.version>2.11.3</jackson.version>
-		<spring-cloud-commons.version>4.1.0-SNAPSHOT</spring-cloud-commons.version>
+		<jackson.version>2.18.2</jackson.version>
+		<spring-cloud-commons.version>4.3.0-SNAPSHOT</spring-cloud-commons.version>
 
 		<!-- Plugin versions -->
 		<maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
 		<!-- Sonar -->
-		<surefire.plugin.version>2.19.1</surefire.plugin.version>
+		<surefire.plugin.version>3.2.2</surefire.plugin.version>
 		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
 		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
 		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec
@@ -78,6 +78,7 @@
 				<configuration>
 					<ignoredResourcePatterns>
 						<ignoredResourcePattern>mozilla/public-suffix-list.txt</ignoredResourcePattern>
+						<ignoredResourcePattern>mockito-extensions/org.mockito.plugins.MockResolver</ignoredResourcePattern>
 					</ignoredResourcePatterns>
 				</configuration>
 			</plugin>

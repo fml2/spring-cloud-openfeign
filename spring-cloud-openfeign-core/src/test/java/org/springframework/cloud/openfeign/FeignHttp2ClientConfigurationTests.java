@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author changjin wei(魏昌进)
+ * @author Luis Duarte
  */
 class FeignHttp2ClientConfigurationTests {
 
@@ -40,10 +41,12 @@ class FeignHttp2ClientConfigurationTests {
 	@BeforeEach
 	void setUp() {
 		context = new SpringApplicationBuilder()
-				.properties("debug=true", "spring.cloud.openfeign.http2client.enabled=true",
-						"spring.cloud.openfeign.httpclient.http2.version=HTTP_1_1",
-						"spring.cloud.openfeign.httpclient.connectionTimeout=15")
-				.web(WebApplicationType.NONE).sources(FeignAutoConfiguration.class).run();
+			.properties("debug=true", "spring.cloud.openfeign.http2client.enabled=true",
+					"spring.cloud.openfeign.httpclient.http2.version=HTTP_1_1",
+					"spring.cloud.openfeign.httpclient.connectionTimeout=15")
+			.web(WebApplicationType.NONE)
+			.sources(FeignAutoConfiguration.class)
+			.run();
 	}
 
 	@AfterEach

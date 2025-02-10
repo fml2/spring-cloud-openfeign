@@ -119,7 +119,10 @@ class FeignClientBuilderTests {
 	void forType_allFieldsSetOnBuilder() {
 		// when:
 		final FeignClientBuilder.Builder builder = this.feignClientBuilder.forType(TestFeignClient.class, "TestClient")
-				.dismiss404(true).url("Url/").path("/Path").contextId("TestContext");
+			.dismiss404(true)
+			.url("Url/")
+			.path("/Path")
+			.contextId("TestContext");
 
 		// then:
 		assertFactoryBeanField(builder, "applicationContext", this.applicationContext);
@@ -128,7 +131,7 @@ class FeignClientBuilderTests {
 		assertFactoryBeanField(builder, "contextId", "TestContext");
 
 		// and:
-		assertFactoryBeanField(builder, "url", "http://Url/");
+		assertFactoryBeanField(builder, "url", "http://Url");
 		assertFactoryBeanField(builder, "path", "/Path");
 		assertFactoryBeanField(builder, "dismiss404", true);
 
@@ -138,8 +141,12 @@ class FeignClientBuilderTests {
 	void forType_clientFactoryBeanProvided() {
 		// when:
 		final FeignClientBuilder.Builder builder = this.feignClientBuilder
-				.forType(TestFeignClient.class, new FeignClientFactoryBean(), "TestClient").dismiss404(true)
-				.path("Path/").url("Url/").contextId("TestContext").customize(Feign.Builder::doNotCloseAfterDecode);
+			.forType(TestFeignClient.class, new FeignClientFactoryBean(), "TestClient")
+			.dismiss404(true)
+			.path("Path/")
+			.url("Url/")
+			.contextId("TestContext")
+			.customize(Feign.Builder::doNotCloseAfterDecode);
 
 		// then:
 		assertFactoryBeanField(builder, "applicationContext", this.applicationContext);
@@ -148,7 +155,7 @@ class FeignClientBuilderTests {
 		assertFactoryBeanField(builder, "contextId", "TestContext");
 
 		// and:
-		assertFactoryBeanField(builder, "url", "http://Url/");
+		assertFactoryBeanField(builder, "url", "http://Url");
 		assertFactoryBeanField(builder, "path", "/Path");
 		assertFactoryBeanField(builder, "dismiss404", true);
 		List<FeignBuilderCustomizer> additionalCustomizers = getFactoryBeanField(builder, "additionalCustomizers");
@@ -159,7 +166,7 @@ class FeignClientBuilderTests {
 	void forType_build() {
 		// given:
 		Mockito.when(this.applicationContext.getBean(FeignClientFactory.class))
-				.thenThrow(new ClosedFileSystemException()); // throw
+			.thenThrow(new ClosedFileSystemException()); // throw
 		// an
 		// unusual
 		// exception

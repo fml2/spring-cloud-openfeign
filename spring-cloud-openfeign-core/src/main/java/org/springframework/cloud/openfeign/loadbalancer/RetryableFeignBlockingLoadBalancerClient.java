@@ -90,7 +90,7 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 	 * @deprecated in favour of
 	 * {@link RetryableFeignBlockingLoadBalancerClient#RetryableFeignBlockingLoadBalancerClient(Client, LoadBalancerClient, LoadBalancedRetryFactory, LoadBalancerClientFactory, List)}
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	public RetryableFeignBlockingLoadBalancerClient(Client delegate, LoadBalancerClient loadBalancerClient,
 			LoadBalancedRetryFactory loadBalancedRetryFactory, LoadBalancerProperties properties,
 			LoadBalancerClientFactory loadBalancerClientFactory) {
@@ -105,7 +105,7 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 	 * @deprecated in favour of
 	 * {@link RetryableFeignBlockingLoadBalancerClient#RetryableFeignBlockingLoadBalancerClient(Client, LoadBalancerClient, LoadBalancedRetryFactory, LoadBalancerClientFactory, List)}
 	 */
-	@Deprecated
+	@Deprecated(forRemoval = true)
 	public RetryableFeignBlockingLoadBalancerClient(Client delegate, LoadBalancerClient loadBalancerClient,
 			LoadBalancedRetryFactory loadBalancedRetryFactory, LoadBalancerClientFactory loadBalancerClientFactory) {
 		this.delegate = delegate;
@@ -137,9 +137,9 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 			Request feignRequest = null;
 			ServiceInstance retrievedServiceInstance = null;
 			Set<LoadBalancerLifecycle> supportedLifecycleProcessors = LoadBalancerLifecycleValidator
-					.getSupportedLifecycleProcessors(
-							loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class),
-							RetryableRequestContext.class, ResponseData.class, ServiceInstance.class);
+				.getSupportedLifecycleProcessors(
+						loadBalancerClientFactory.getInstances(serviceId, LoadBalancerLifecycle.class),
+						RetryableRequestContext.class, ResponseData.class, ServiceInstance.class);
 			String hint = getHint(serviceId);
 			DefaultRequest<RetryableRequestContext> lbRequest = new DefaultRequest<>(
 					new RetryableRequestContext(null, buildRequestData(request), hint));
@@ -169,8 +169,8 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 					org.springframework.cloud.client.loadbalancer.Response<ServiceInstance> lbResponse = new DefaultResponse(
 							retrievedServiceInstance);
 					supportedLifecycleProcessors.forEach(lifecycle -> lifecycle
-							.onComplete(new CompletionContext<ResponseData, ServiceInstance, RetryableRequestContext>(
-									CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
+						.onComplete(new CompletionContext<ResponseData, ServiceInstance, RetryableRequestContext>(
+								CompletionContext.Status.DISCARD, lbRequest, lbResponse)));
 					feignRequest = request;
 				}
 				else {
@@ -179,7 +179,7 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 								retrievedServiceInstance));
 					}
 					String reconstructedUrl = loadBalancerClient.reconstructURI(retrievedServiceInstance, originalUri)
-							.toString();
+						.toString();
 					feignRequest = buildRequest(request, reconstructedUrl, retrievedServiceInstance);
 				}
 			}
@@ -255,6 +255,12 @@ public class RetryableFeignBlockingLoadBalancerClient implements Client {
 			@Override
 			public URI getURI() {
 				return URI.create(request.url());
+			}
+
+			@Override
+			public Map<String, Object> getAttributes() {
+				Map<String, Object> attributes = new HashMap<>(request.requestTemplate().queries());
+				return attributes;
 			}
 
 			@Override

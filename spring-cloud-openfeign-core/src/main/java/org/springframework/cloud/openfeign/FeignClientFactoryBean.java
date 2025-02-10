@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2023 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.cloud.openfeign;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -72,6 +73,7 @@ import org.springframework.util.StringUtils;
  * @author Hyeonmin Park
  * @author Felix Dittrich
  * @author Dominique Villard
+ * @author Can Bezmen
  */
 public class FeignClientFactoryBean
 		implements FactoryBean<Object>, InitializingBean, ApplicationContextAware, BeanFactoryAware {
@@ -153,8 +155,10 @@ public class FeignClientFactoryBean
 				FeignBuilderCustomizer.class);
 
 		if (customizerMap != null) {
-			customizerMap.values().stream().sorted(AnnotationAwareOrderComparator.INSTANCE)
-					.forEach(feignBuilderCustomizer -> feignBuilderCustomizer.customize(builder));
+			customizerMap.values()
+				.stream()
+				.sorted(AnnotationAwareOrderComparator.INSTANCE)
+				.forEach(feignBuilderCustomizer -> feignBuilderCustomizer.customize(builder));
 		}
 		additionalCustomizers.forEach(customizer -> customizer.customize(builder));
 	}
@@ -169,14 +173,16 @@ public class FeignClientFactoryBean
 		if (properties != null && inheritParentContext) {
 			if (properties.isDefaultToProperties()) {
 				configureUsingConfiguration(context, builder);
-				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
-				configureUsingProperties(properties.getConfig().get(contextId), builder);
+				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()),
+						properties.getConfig().get(contextId), builder);
 			}
 			else {
-				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()), builder);
-				configureUsingProperties(properties.getConfig().get(contextId), builder);
+				configureUsingProperties(properties.getConfig().get(properties.getDefaultConfig()),
+						properties.getConfig().get(contextId), builder);
 				configureUsingConfiguration(context, builder);
 			}
+			configureDefaultRequestElements(properties.getConfig().get(properties.getDefaultConfig()),
+					properties.getConfig().get(contextId), builder);
 		}
 		else {
 			configureUsingConfiguration(context, builder);
@@ -240,8 +246,23 @@ public class FeignClientFactoryBean
 
 		Map<String, Capability> capabilities = getInheritedAwareInstances(context, Capability.class);
 		if (capabilities != null) {
-			capabilities.values().stream().sorted(AnnotationAwareOrderComparator.INSTANCE)
-					.forEach(builder::addCapability);
+			capabilities.values()
+				.stream()
+				.sorted(AnnotationAwareOrderComparator.INSTANCE)
+				.forEach(builder::addCapability);
+		}
+	}
+
+	protected void configureUsingProperties(FeignClientProperties.FeignClientConfiguration baseConfig,
+			FeignClientProperties.FeignClientConfiguration finalConfig, Feign.Builder builder) {
+		configureUsingProperties(baseConfig, builder);
+		configureUsingProperties(finalConfig, builder);
+		Boolean dismiss404 = finalConfig != null && finalConfig.getDismiss404() != null ? finalConfig.getDismiss404()
+				: (baseConfig != null && baseConfig.getDismiss404() != null ? baseConfig.getDismiss404() : null);
+		if (dismiss404 != null) {
+			if (dismiss404) {
+				builder.dismiss404();
+			}
 		}
 	}
 
@@ -287,18 +308,9 @@ public class FeignClientFactoryBean
 			builder.responseInterceptor(getOrInstantiate(config.getResponseInterceptor()));
 		}
 
-		if (config.getDismiss404() != null) {
-			if (config.getDismiss404()) {
-				builder.dismiss404();
-			}
-		}
-
 		if (Objects.nonNull(config.getEncoder())) {
 			builder.encoder(getOrInstantiate(config.getEncoder()));
 		}
-
-		addDefaultRequestHeaders(config, builder);
-		addDefaultQueryParams(config, builder);
 
 		if (Objects.nonNull(config.getDecoder())) {
 			builder.decoder(getOrInstantiate(config.getDecoder()));
@@ -321,33 +333,56 @@ public class FeignClientFactoryBean
 		}
 	}
 
-	private void addDefaultQueryParams(FeignClientProperties.FeignClientConfiguration config, Feign.Builder builder) {
-		Map<String, Collection<String>> defaultQueryParameters = config.getDefaultQueryParameters();
-		if (Objects.nonNull(defaultQueryParameters)) {
-			builder.requestInterceptor(requestTemplate -> {
-				Map<String, Collection<String>> queries = requestTemplate.queries();
-				defaultQueryParameters.keySet().forEach(key -> {
-					if (!queries.containsKey(key)) {
-						requestTemplate.query(key, defaultQueryParameters.get(key));
-					}
-				});
-			});
+	protected void configureDefaultRequestElements(FeignClientProperties.FeignClientConfiguration defaultConfig,
+			FeignClientProperties.FeignClientConfiguration clientConfig, Feign.Builder builder) {
+		Map<String, Collection<String>> defaultRequestHeaders = new HashMap<>();
+		if (defaultConfig != null) {
+			defaultConfig.getDefaultRequestHeaders()
+				.forEach((k, v) -> defaultRequestHeaders.put(k, new ArrayList<>(v)));
 		}
+		if (clientConfig != null) {
+			clientConfig.getDefaultRequestHeaders().forEach((k, v) -> defaultRequestHeaders.put(k, new ArrayList<>(v)));
+		}
+		if (!defaultRequestHeaders.isEmpty()) {
+			addDefaultRequestHeaders(defaultRequestHeaders, builder);
+		}
+
+		Map<String, Collection<String>> defaultQueryParameters = new HashMap<>();
+		if (defaultConfig != null) {
+			defaultConfig.getDefaultQueryParameters()
+				.forEach((k, v) -> defaultQueryParameters.put(k, new ArrayList<>(v)));
+		}
+		if (clientConfig != null) {
+			clientConfig.getDefaultQueryParameters()
+				.forEach((k, v) -> defaultQueryParameters.put(k, new ArrayList<>(v)));
+		}
+		if (!defaultQueryParameters.isEmpty()) {
+			addDefaultQueryParams(defaultQueryParameters, builder);
+		}
+
 	}
 
-	private void addDefaultRequestHeaders(FeignClientProperties.FeignClientConfiguration config,
-			Feign.Builder builder) {
-		Map<String, Collection<String>> defaultRequestHeaders = config.getDefaultRequestHeaders();
-		if (Objects.nonNull(defaultRequestHeaders)) {
-			builder.requestInterceptor(requestTemplate -> {
-				Map<String, Collection<String>> headers = requestTemplate.headers();
-				defaultRequestHeaders.keySet().forEach(key -> {
-					if (!headers.containsKey(key)) {
-						requestTemplate.header(key, defaultRequestHeaders.get(key));
-					}
-				});
+	private void addDefaultQueryParams(Map<String, Collection<String>> defaultQueryParameters, Feign.Builder builder) {
+		builder.requestInterceptor(requestTemplate -> {
+			Map<String, Collection<String>> queries = requestTemplate.queries();
+			defaultQueryParameters.keySet().forEach(key -> {
+				if (!queries.containsKey(key)) {
+					requestTemplate.query(key, defaultQueryParameters.get(key));
+				}
 			});
-		}
+		});
+	}
+
+	private void addDefaultRequestHeaders(Map<String, Collection<String>> defaultRequestHeaders,
+			Feign.Builder builder) {
+		builder.requestInterceptor(requestTemplate -> {
+			Map<String, Collection<String>> headers = requestTemplate.headers();
+			defaultRequestHeaders.keySet().forEach(key -> {
+				if (!headers.containsKey(key)) {
+					requestTemplate.header(key, defaultRequestHeaders.get(key));
+				}
+			});
+		});
 	}
 
 	private <T> T getOrInstantiate(Class<T> tClass) {
@@ -436,7 +471,7 @@ public class FeignClientFactoryBean
 			if (LOG.isInfoEnabled()) {
 				LOG.info("For '" + name + "' URL not provided. Will try picking an instance via load-balancing.");
 			}
-			if (!name.startsWith("http")) {
+			if (!name.startsWith("http://") && !name.startsWith("https://")) {
 				url = "http://" + name;
 			}
 			else {
@@ -445,10 +480,9 @@ public class FeignClientFactoryBean
 			url += cleanPath();
 			return (T) loadBalance(builder, feignClientFactory, new HardCodedTarget<>(type, name, url));
 		}
-		if (StringUtils.hasText(url) && !url.startsWith("http")) {
+		if (StringUtils.hasText(url) && !url.startsWith("http://") && !url.startsWith("https://")) {
 			url = "http://" + url;
 		}
-		String url = this.url + cleanPath();
 		Client client = getOptional(feignClientFactory, Client.class);
 		if (client != null) {
 			if (client instanceof FeignBlockingLoadBalancerClient) {
@@ -489,14 +523,14 @@ public class FeignClientFactoryBean
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private <T> HardCodedTarget<T> resolveTarget(FeignClientFactory context, String contextId, String url) {
 		if (StringUtils.hasText(url)) {
-			return new HardCodedTarget(type, name, url);
+			return new HardCodedTarget(type, name, url + cleanPath());
 		}
 
 		if (refreshableClient) {
 			RefreshableUrl refreshableUrl = context.getInstance(contextId,
 					RefreshableUrl.class.getCanonicalName() + "-" + contextId, RefreshableUrl.class);
 			if (Objects.nonNull(refreshableUrl) && StringUtils.hasText(refreshableUrl.getUrl())) {
-				return new RefreshableHardCodedTarget<>(type, name, refreshableUrl);
+				return new RefreshableHardCodedTarget<>(type, name, refreshableUrl, cleanPath());
 			}
 		}
 		FeignClientProperties.FeignClientConfiguration config = findConfigByKey(contextId);
@@ -505,7 +539,7 @@ public class FeignClientFactoryBean
 					"Provide Feign client URL either in @FeignClient() or in config properties.");
 		}
 
-		return new PropertyBasedTarget(type, name, config);
+		return new PropertyBasedTarget(type, name, config, cleanPath());
 	}
 
 	private boolean isUrlAvailableInConfig(String contextId) {
@@ -656,15 +690,48 @@ public class FeignClientFactoryBean
 
 	@Override
 	public String toString() {
-		return new StringBuilder("FeignClientFactoryBean{").append("type=").append(type).append(", ").append("name='")
-				.append(name).append("', ").append("url='").append(url).append("', ").append("path='").append(path)
-				.append("', ").append("dismiss404=").append(dismiss404).append(", ").append("inheritParentContext=")
-				.append(inheritParentContext).append(", ").append("applicationContext=").append(applicationContext)
-				.append(", ").append("beanFactory=").append(beanFactory).append(", ").append("fallback=")
-				.append(fallback).append(", ").append("fallbackFactory=").append(fallbackFactory).append("}")
-				.append("connectTimeoutMillis=").append(connectTimeoutMillis).append("}").append("readTimeoutMillis=")
-				.append(readTimeoutMillis).append("}").append("followRedirects=").append(followRedirects)
-				.append("refreshableClient=").append(refreshableClient).append("}").toString();
+		return new StringBuilder("FeignClientFactoryBean{").append("type=")
+			.append(type)
+			.append(", ")
+			.append("name='")
+			.append(name)
+			.append("', ")
+			.append("url='")
+			.append(url)
+			.append("', ")
+			.append("path='")
+			.append(path)
+			.append("', ")
+			.append("dismiss404=")
+			.append(dismiss404)
+			.append(", ")
+			.append("inheritParentContext=")
+			.append(inheritParentContext)
+			.append(", ")
+			.append("applicationContext=")
+			.append(applicationContext)
+			.append(", ")
+			.append("beanFactory=")
+			.append(beanFactory)
+			.append(", ")
+			.append("fallback=")
+			.append(fallback)
+			.append(", ")
+			.append("fallbackFactory=")
+			.append(fallbackFactory)
+			.append("}")
+			.append("connectTimeoutMillis=")
+			.append(connectTimeoutMillis)
+			.append("}")
+			.append("readTimeoutMillis=")
+			.append(readTimeoutMillis)
+			.append("}")
+			.append("followRedirects=")
+			.append(followRedirects)
+			.append("refreshableClient=")
+			.append(refreshableClient)
+			.append("}")
+			.toString();
 	}
 
 	@Override

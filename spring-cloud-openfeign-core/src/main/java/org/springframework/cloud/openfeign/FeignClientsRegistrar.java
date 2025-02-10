@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2022 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ import org.springframework.util.StringUtils;
  * @author Marcin Grzejszczak
  * @author Olga Maciaszek-Sharma
  * @author Jasbir Singh
+ * @author Jinho Lee
  */
 class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLoaderAware, EnvironmentAware {
 
@@ -116,6 +117,9 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		if (StringUtils.hasText(url) && !(url.startsWith("#{") && url.contains("}"))) {
 			if (!url.contains("://")) {
 				url = "http://" + url;
+			}
+			if (url.endsWith("/")) {
+				url = url.substring(0, url.length() - 1);
 			}
 			try {
 				new URL(url);
@@ -192,7 +196,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 				Assert.isTrue(annotationMetadata.isInterface(), "@FeignClient can only be specified on an interface");
 
 				Map<String, Object> attributes = annotationMetadata
-						.getAnnotationAttributes(FeignClient.class.getCanonicalName());
+					.getAnnotationAttributes(FeignClient.class.getCanonicalName());
 
 				String name = getClientName(attributes);
 				String className = annotationMetadata.getClassName();
@@ -206,8 +210,9 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 	private void registerFeignClient(BeanDefinitionRegistry registry, AnnotationMetadata annotationMetadata,
 			Map<String, Object> attributes) {
 		String className = annotationMetadata.getClassName();
-		if (String.valueOf(false).equals(
-				environment.getProperty("spring.cloud.openfeign.lazy-attributes-resolution", String.valueOf(false)))) {
+		if (String.valueOf(false)
+			.equals(environment.getProperty("spring.cloud.openfeign.lazy-attributes-resolution",
+					String.valueOf(false)))) {
 			eagerlyRegisterFeignClientBeanDefinition(className, attributes, registry);
 		}
 		else {
@@ -248,6 +253,8 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		// code
 		definition.addPropertyValue("qualifiers", qualifiers);
 		AbstractBeanDefinition beanDefinition = definition.getBeanDefinition();
+		Class<?> type = ClassUtils.resolveClassName(className, null);
+		beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, type);
 		// has a default, won't be null
 		boolean primary = (Boolean) attributes.get("primary");
 		beanDefinition.setPrimary(primary);
@@ -291,7 +298,6 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		validate(attributes);
 
 		AbstractBeanDefinition beanDefinition = definition.getBeanDefinition();
-		beanDefinition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, className);
 		beanDefinition.setAttribute("feignClientsRegistrarFactoryBean", factoryBean);
 
 		// has a default, won't be null
@@ -319,11 +325,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		validateFallbackFactory(annotation.getClass("fallbackFactory"));
 	}
 
-	/* for testing */ String getName(Map<String, Object> attributes) {
-		return getName(null, attributes);
-	}
-
-	String getName(ConfigurableBeanFactory beanFactory, Map<String, Object> attributes) {
+	String getName(Map<String, Object> attributes) {
 		String name = (String) attributes.get("serviceId");
 		if (!StringUtils.hasText(name)) {
 			name = (String) attributes.get("name");
@@ -331,7 +333,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 		if (!StringUtils.hasText(name)) {
 			name = (String) attributes.get("value");
 		}
-		name = resolve(beanFactory, name);
+		name = resolve(null, name);
 		return getName(name);
 	}
 
@@ -391,7 +393,7 @@ class FeignClientsRegistrar implements ImportBeanDefinitionRegistrar, ResourceLo
 
 	protected Set<String> getBasePackages(AnnotationMetadata importingClassMetadata) {
 		Map<String, Object> attributes = importingClassMetadata
-				.getAnnotationAttributes(EnableFeignClients.class.getCanonicalName());
+			.getAnnotationAttributes(EnableFeignClients.class.getCanonicalName());
 
 		Set<String> basePackages = new HashSet<>();
 		for (String pkg : (String[]) attributes.get("value")) {

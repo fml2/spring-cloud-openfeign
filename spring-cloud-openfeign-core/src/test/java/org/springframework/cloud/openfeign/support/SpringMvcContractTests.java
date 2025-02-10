@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2023 the original author or authors.
+ * Copyright 2013-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.cloud.openfeign.CollectionFormat;
+import org.springframework.cloud.openfeign.FeignClientProperties;
 import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.data.domain.Page;
@@ -82,6 +83,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * @author Szymon Linowski
  * @author Sam Kruglov
  * @author Bhavya Agrawal
+ * @author Tang Xiong
  **/
 
 class SpringMvcContractTests {
@@ -137,7 +139,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test/{id}");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 		assertThat(data.template().decodeSlash()).isTrue();
 	}
 
@@ -171,7 +173,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test/{id}");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 		assertThat(data.indexToName().get(0).iterator().next()).isEqualTo("id");
 	}
@@ -184,18 +186,33 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
-	void testProcessAnnotations_SimplePathIsOnlyASlash() throws Exception {
-		Method method = TestTemplate_Simple.class.getDeclaredMethod("getSlashPath", String.class);
+	void testProcessAnnotations_SimplePathIsOnlyASlashWithParam() throws Exception {
+		Method method = TestTemplate_Simple.class.getDeclaredMethod("getSlashPathWithParam", String.class);
 		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
 
 		assertThat(data.template().url()).isEqualTo("/?id=" + "{id}");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+	}
+
+	@Test
+	void testProcessAnnotations_SimplePathIsOnlyASlashWithParamWithTrailingSlashRemoval() throws Exception {
+		FeignClientProperties properties = new FeignClientProperties();
+		properties.setRemoveTrailingSlash(true);
+		contract = new SpringMvcContract(Collections.emptyList(), getConversionService(), properties);
+		Method method = TestTemplate_Simple.class.getDeclaredMethod("getSlashPathWithParam", String.class);
+
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/?id=" + "{id}");
+		assertThat(data.template().method()).isEqualTo("GET");
+		assertThat(data.template().headers().get("Accept").iterator().next())
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
@@ -206,7 +223,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test?name=" + "{name}");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
@@ -217,7 +234,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test/{id}");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 		assertThat(data.indexToName().get(0).iterator().next()).isEqualTo("id");
 	}
@@ -267,7 +284,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/");
 		assertThat(data.template().method()).isEqualTo("POST");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 	}
 
@@ -279,8 +296,50 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/");
 		assertThat(data.template().method()).isEqualTo("POST");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
+	}
+
+	@Test
+	void testProcessAnnotations_SimplePathIsOnlyASlashWithTrailingSlashRemoval() throws Exception {
+		FeignClientProperties properties = new FeignClientProperties();
+		properties.setRemoveTrailingSlash(true);
+		contract = new SpringMvcContract(Collections.emptyList(), getConversionService(), properties);
+		Method method = TestTemplate_Simple.class.getDeclaredMethod("getSlashPath");
+
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/");
+		assertThat(data.template().method()).isEqualTo("GET");
+		assertThat(data.template().headers().get("Accept").iterator().next())
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+	}
+
+	@Test
+	void testProcessAnnotations_SimplePathHasTrailingSlash() throws Exception {
+		Method method = TestTemplate_Simple.class.getDeclaredMethod("getTrailingSlash");
+
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test1/test2/");
+		assertThat(data.template().method()).isEqualTo("GET");
+		assertThat(data.template().headers().get("Accept").iterator().next())
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+	}
+
+	@Test
+	void testProcessAnnotations_SimplePathHasTrailingSlashWithTrailingSlashRemoval() throws Exception {
+		FeignClientProperties properties = new FeignClientProperties();
+		properties.setRemoveTrailingSlash(true);
+		contract = new SpringMvcContract(Collections.emptyList(), getConversionService(), properties);
+		Method method = TestTemplate_Simple.class.getDeclaredMethod("getTrailingSlash");
+
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test1/test2");
+		assertThat(data.template().method()).isEqualTo("GET");
+		assertThat(data.template().headers().get("Accept").iterator().next())
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
@@ -292,7 +351,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test/{id}?amount=" + "{amount}");
 		assertThat(data.template().method()).isEqualTo("PUT");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
@@ -331,7 +390,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test/{id}?amount=" + "{amount}");
 		assertThat(data.template().method()).isEqualTo("PUT");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 		assertThat(data.indexToName().get(0).iterator().next()).isEqualTo("Authorization");
 		assertThat(data.indexToName().get(1).iterator().next()).isEqualTo("id");
@@ -350,7 +409,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/test2?amount=" + "{amount}");
 		assertThat(data.template().method()).isEqualTo("PUT");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 		assertThat(data.indexToName().get(0).iterator().next()).isEqualTo("Authorization");
 		assertThat(data.indexToName().get(1).iterator().next()).isEqualTo("amount");
@@ -402,7 +461,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 	}
 
 	@Test
@@ -413,7 +472,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/");
 		assertThat(data.template().method()).isEqualTo("GET");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 		assertThat(data.template().decodeSlash()).isTrue();
 	}
 
@@ -463,6 +522,68 @@ class SpringMvcContractTests {
 	}
 
 	@Test
+	void testProcessAnnotations_ParseParams_SingleParam() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("singleParam");
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1=1");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_MultipleParams() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("multipleParams");
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1=1&p2=2");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_MixParams() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("mixParams");
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1=1&p2");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_SingleParamWithoutValue() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("singleParamWithoutValue");
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_MultipleParamsWithoutValue() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("multipleParamsWithoutValue");
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1&p2");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_NotEqualParams() throws Exception {
+		assertThatIllegalArgumentException().isThrownBy(() -> {
+			Method method = TestTemplate_ParseParams.class.getDeclaredMethod("notEqualParams");
+			contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+		});
+	}
+
+	@Test
+	void testProcessAnnotations_ParseParams_ParamsAndRequestParam() throws Exception {
+		Method method = TestTemplate_ParseParams.class.getDeclaredMethod("paramsAndRequestParam", String.class);
+		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
+
+		assertThat(data.template().url()).isEqualTo("/test?p1=1&p2={p2}");
+		assertThat(data.template().method()).isEqualTo("GET");
+	}
+
+	@Test
 	void testProcessHeaders() throws Exception {
 		Method method = TestTemplate_Headers.class.getDeclaredMethod("getTest", String.class);
 		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
@@ -494,7 +615,7 @@ class SpringMvcContractTests {
 		assertThat(data.template().url()).isEqualTo("/testfallback/{id}?amount=" + "{amount}");
 		assertThat(data.template().method()).isEqualTo("PUT");
 		assertThat(data.template().headers().get("Accept").iterator().next())
-				.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
+			.isEqualTo(MediaType.APPLICATION_JSON_VALUE);
 
 		assertThat(data.indexToName().get(0).iterator().next()).isEqualTo("Authorization");
 		assertThat(data.indexToName().get(1).iterator().next()).isEqualTo("id");
@@ -521,7 +642,7 @@ class SpringMvcContractTests {
 		Method method = TestTemplate_HeaderMap.class.getDeclaredMethod("headerMapMoreThanOnce", MultiValueMap.class,
 				MultiValueMap.class);
 		assertThatExceptionOfType(IllegalStateException.class)
-				.isThrownBy(() -> contract.parseAndValidateMetadata(method.getDeclaringClass(), method));
+			.isThrownBy(() -> contract.parseAndValidateMetadata(method.getDeclaringClass(), method));
 	}
 
 	@Test
@@ -553,7 +674,7 @@ class SpringMvcContractTests {
 		Method method = TestTemplate_QueryMap.class.getDeclaredMethod("queryMapMoreThanOnce", MultiValueMap.class,
 				MultiValueMap.class);
 		assertThatExceptionOfType(IllegalStateException.class)
-				.isThrownBy(() -> contract.parseAndValidateMetadata(method.getDeclaringClass(), method));
+			.isThrownBy(() -> contract.parseAndValidateMetadata(method.getDeclaringClass(), method));
 	}
 
 	@Test
@@ -625,7 +746,7 @@ class SpringMvcContractTests {
 
 		MethodMetadata data = contract.parseAndValidateMetadata(method.getDeclaringClass(), method);
 		assertThat(data.template().headers().get("cookie").iterator().next())
-				.isEqualTo("cookie1={cookie1}; cookie2={cookie2}");
+			.isEqualTo("cookie1={cookie1}; cookie2={cookie2}");
 	}
 
 	@Test
@@ -675,7 +796,13 @@ class SpringMvcContractTests {
 		TestObject postMappingTest(@RequestBody TestObject object);
 
 		@GetMapping(value = "/", produces = MediaType.APPLICATION_JSON_VALUE)
-		ResponseEntity<TestObject> getSlashPath(@RequestParam("id") String id);
+		ResponseEntity<TestObject> getSlashPathWithParam(@RequestParam("id") String id);
+
+		@GetMapping(value = "/", produces = MediaType.APPLICATION_JSON_VALUE)
+		ResponseEntity<TestObject> getSlashPath();
+
+		@GetMapping(value = "test1/test2/", produces = MediaType.APPLICATION_JSON_VALUE)
+		ResponseEntity<TestObject> getTrailingSlash();
 
 		@GetMapping(path = "test", produces = MediaType.APPLICATION_JSON_VALUE)
 		ResponseEntity<TestObject> getTestNoLeadingSlash(@RequestParam("name") String name);
@@ -747,6 +874,31 @@ class SpringMvcContractTests {
 
 		@GetMapping("/test")
 		ResponseEntity<TestObject> getTest(@RequestParam Map<String, String> params);
+
+	}
+
+	public interface TestTemplate_ParseParams {
+
+		@GetMapping(value = "test", params = "p1=1")
+		ResponseEntity<TestObject> singleParam();
+
+		@GetMapping(value = "test", params = { "p1=1", "p2=2" })
+		ResponseEntity<TestObject> multipleParams();
+
+		@GetMapping(value = "test", params = { "p1" })
+		ResponseEntity<TestObject> singleParamWithoutValue();
+
+		@GetMapping(value = "test", params = { "p1", "p2" })
+		ResponseEntity<TestObject> multipleParamsWithoutValue();
+
+		@GetMapping(value = "test", params = { "p1=1", "p2" })
+		ResponseEntity<TestObject> mixParams();
+
+		@GetMapping(value = "test", params = { "p1!=1" })
+		ResponseEntity<TestObject> notEqualParams();
+
+		@GetMapping(value = "test", params = { "p1=1" })
+		ResponseEntity<TestObject> paramsAndRequestParam(@RequestParam("p2") String p2);
 
 	}
 
@@ -914,8 +1066,13 @@ class SpringMvcContractTests {
 
 		@Override
 		public String toString() {
-			return new StringBuilder("TestObject{").append("something='").append(something).append("', ")
-					.append("number=").append(number).append("}").toString();
+			return new StringBuilder("TestObject{").append("something='")
+				.append(something)
+				.append("', ")
+				.append("number=")
+				.append(number)
+				.append("}")
+				.toString();
 		}
 
 	}
